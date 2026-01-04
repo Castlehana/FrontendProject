@@ -1,0 +1,90 @@
+:root {
+  --bg: #0b0d12;
+  --panel: #151a22;
+  --panel-2: #0f1320;
+  --text: #e8eefc;
+  --muted: #9aa7c0;
+  --key: #1c2330;
+  --util: #283144;
+  --op: #2b3b5a;
+  --eq: #3c5cff;
+  --radius: 20px;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+  background: radial-gradient(1200px 800px at 50% 50%, #18203a 0%, var(--bg) 40%);
+  color: var(--text);
+}
+
+.app {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.calc {
+  width: min(360px, 100%);
+  background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+}
+
+.display {
+  border-radius: 16px;
+  padding: 16px 14px;
+  background: rgba(0,0,0,0.25);
+  margin-bottom: 14px;
+}
+
+.display_history {
+  color: var(--muted);
+  font-size: 14px;
+  text-align: right;
+  min-height: 18px;
+  letter-spacing: 0.2px;
+}
+
+.display_result {
+  font-size: 44px;
+  font-weight: 700;
+  text-align: right;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keys {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.key {
+  height: 62px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--key);
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 650;
+  user-select: none;
+  box-shadow: inset 0 -2px 0 rgba(255,255,255,0.06);
+}
+
+
+.key--util { background: var(--util); }
+.key--op { background: var(--op); }
+.key--eq { background: var(--eq); }
+
+.key--zero {
+  grid-column: span 2;
+  text-align: center;
+  padding-left: 22px;
+}
