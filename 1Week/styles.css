@@ -200,84 +200,6 @@ body {
   border-radius: 3px;
 }
 
-/* Skills */
-.skills-group {
-  margin-bottom: 24px;
-}
-
-.skills-group:last-child {
-  margin-bottom: 0;
-}
-
-.skills-category {
-  font-size: 16px;
-  font-weight: 600;
-  color: #37352f;
-  margin-bottom: 8px;
-  padding-top: 8px;
-}
-
-.skills-list {
-  list-style: none;
-  padding: 0;
-  margin-left: 0;
-}
-
-.skills-list li {
-  padding: 6px 0;
-  color: #37352f;
-  font-size: 16px;
-  line-height: 1.6;
-  border-bottom: 1px solid #f1f1ef;
-}
-
-.skills-list li:last-child {
-  border-bottom: none;
-}
-
-.skills-list li:hover {
-  background-color: #f7f6f3;
-  margin: 0 -16px;
-  padding: 6px 16px;
-  border-radius: 3px;
-}
-
-/* Projects List */
-.projects-list {
-  list-style: none;
-  padding: 0;
-}
-
-.projects-list li {
-  padding: 10px 0;
-  border-bottom: 1px solid #f1f1ef;
-  color: #37352f;
-  font-size: 16px;
-  line-height: 1.6;
-}
-
-.projects-list li:last-child {
-  border-bottom: none;
-}
-
-.projects-list li:hover {
-  background-color: #f7f6f3;
-  margin: 0 -16px;
-  padding: 10px 16px;
-  border-radius: 3px;
-}
-
-/* Footer */
-.footer {
-  background-color: #ffffff;
-  border-top: 1px solid #e9e9e7;
-  padding: 24px 0;
-  margin-top: 40px;
-  text-align: center;
-  color: #787774;
-  font-size: 14px;
-}
-
 /* Responsive Design */
 /* Tablet (1024px) */
 @media (max-width: 1024px) {
@@ -411,9 +333,7 @@ body {
     font-size: 15px;
   }
 
-  .experience-list li,
-  .skills-list li,
-  .projects-list li {
+  .experience-list li {
     font-size: 15px;
   }
 }
