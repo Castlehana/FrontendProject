@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project#1 시계</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="app">
+    <section class="clock" aria-label="clock">
+
+      <!-- frame 밖에 충전 요소를 놓기 위해 wrapper -->
+      <div class="stage">
+
+        <!-- (밖) 연결 단자 -->
+        <div class="port" id="port" aria-label="charging port">
+          <span class="port__hole"></span>
+        </div>
+
+        <!-- (밖) 드래그 가능한 굵은 흰 선(케이블) -->
+        <div class="cable" id="cable" role="button" aria-label="charging cable">
+          <div class="cable__line"></div>
+          <div class="cable__head" id="cableHead"></div>
+        </div>
+
+        <!-- 시계 박스 -->
+        <div class="frame">
+
+          <!-- (우상단) 배터리 박스 -->
+          <div class="battery" id="batteryBox" aria-label="battery">
+            <span class="battery__label">배터리 :</span>
+            <strong class="battery__value" id="batteryText">100%</strong>
+          </div>
+
+          <!-- (중앙 레이아웃) -->
+          <div class="layout">
+            <div class="timeArea">
+              <div class="label">시간</div>
+              <div class="timeBox" id="timeDisplay">---- -- -- --:--:--</div>
+            </div>
+
+            <div class="statusArea">
+              <div class="label">알람 현황</div>
+              <div class="statusBox" id="alarmStatusBox"></div>
+            </div>
+
+            <div class="alarmRow">
+              <div class="alarmRow__label">알람</div>
+
+              <div class="mini">
+                <span class="mini__txt">시</span>
+                <input id="hour" class="mini__input" type="number" min="0" max="23" value="0" />
+              </div>
+
+              <div class="mini">
+                <span class="mini__txt">분</span>
+                <input id="min" class="mini__input" type="number" min="0" max="59" value="0" />
+              </div>
+
+              <div class="mini">
+                <span class="mini__txt">초</span>
+                <input id="sec" class="mini__input" type="number" min="0" max="59" value="0" />
+              </div>
+
+              <button class="btn" id="addAlarmBtn" type="button">추가</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+
+    const timeDisplay = $("#timeDisplay");
+    const batteryText = $("#batteryText");
+    const batteryBox  = $("#batteryBox");
+    const alarmStatusBox = $("#alarmStatusBox");
+
+    const hourInput = $("#hour");
+    const minInput  = $("#min");
+    const secInput  = $("#sec");
+    const addAlarmBtn = $("#addAlarmBtn");
+
+    // NEW: port + cable
+    const port = $("#port");
+    const cable = $("#cable");
+    const cableHead = $("#cableHead");
+
+    // FR1/FR2
+    let battery = 100;
+    let charging = false;
+
+    // FR3/FR4
+    const alarms = []; // { hh, mm, ss, firedKey }
+    let lastSecondKey = "";
+
+    function pad2(n){ return String(n).padStart(2,"0"); }
+    function clamp(n, lo, hi){ return Math.max(lo, Math.min(hi, n)); }
+
+    function formatNow(d){
+      const yyyy = d.getFullYear();
+      const mm = pad2(d.getMonth()+1);
+      const dd = pad2(d.getDate());
+      const hh = pad2(d.getHours());
+      const mi = pad2(d.getMinutes());
+      const ss = pad2(d.getSeconds());
+      return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+    }
+
+    function setBattery(next){
+      battery = clamp(next, 0, 100);
+      batteryText.textContent = `${battery}%`;
+
+      if (battery === 0) timeDisplay.classList.add("off");
+      else timeDisplay.classList.remove("off");
+    }
+
+    function renderAlarmStatus(){
+      if (alarms.length === 0){
+        alarmStatusBox.textContent = "";
+        alarmStatusBox.classList.remove("hasText");
+        return;
+      }
+
+      const sorted = [...alarms].sort((a,b)=>{
+        const ta = a.hh*3600 + a.mm*60 + a.ss;
+        const tb = b.hh*3600 + b.mm*60 + b.ss;
+        return ta - tb;
+      });
+
+      alarmStatusBox.textContent = sorted
+        .map((a,i)=> `${i+1}. ${pad2(a.hh)}:${pad2(a.mm)}:${pad2(a.ss)}`)
+        .join("\n");
+
+      alarmStatusBox.classList.add("hasText");
+    }
+
+    function beep(ms=450){
+      try{
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "square";
+        osc.frequency.value = 880;
+        gain.gain.value = 0.03;
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start();
+        setTimeout(()=>{ osc.stop(); ctx.close(); }, ms);
+      }catch(e){}
+    }
+
+    function fireAlarm(atText){
+      alarmStatusBox.classList.add("ring");
+      beep(600);
+      setTimeout(()=> alarmStatusBox.classList.remove("ring"), 800);
+      alert(`알람! ${atText}`);
+    }
+
+    function setCharging(on){
+      charging = on;
+      batteryBox.classList.toggle("charging", on); // 연두 글로우
+      port.classList.toggle("connected", on);
+      cable.classList.toggle("connected", on);
+    }
+
+    function tick(){
+      const now = new Date();
+      timeDisplay.textContent = formatNow(now);
+
+      const secondKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}-${now.getSeconds()}`;
+      if (secondKey !== lastSecondKey){
+        lastSecondKey = secondKey;
+
+        // 배터리 증감
+        if (charging) setBattery(battery + 1);
+        else setBattery(battery - 1);
+
+        // 알람 체크
+        const hh = now.getHours(), mm = now.getMinutes(), ss = now.getSeconds();
+        const todayKey = `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}`;
+
+        alarms.forEach(a=>{
+          const firedKey = `${todayKey}-${a.hh}-${a.mm}-${a.ss}`;
+          if (a.hh===hh && a.mm===mm && a.ss===ss && a.firedKey!==firedKey){
+            a.firedKey = firedKey;
+            fireAlarm(`${pad2(a.hh)}:${pad2(a.mm)}:${pad2(a.ss)}`);
+          }
+        });
+
+        renderAlarmStatus();
+      }
+
+      requestAnimationFrame(tick);
+    }
+
+    // 알람 추가(최대 3개)
+    addAlarmBtn.addEventListener("click", ()=>{
+      if (alarms.length >= 3){
+        alert("최대 3개 알람까지만 가능합니다.");
+        return;
+      }
+
+      let hh = clamp(Number(hourInput.value||0), 0, 23);
+      let mm = clamp(Number(minInput.value||0), 0, 59);
+      let ss = clamp(Number(secInput.value||0), 0, 59);
+
+      hourInput.value = hh;
+      minInput.value  = mm;
+      secInput.value  = ss;
+
+      const exists = alarms.some(a => a.hh===hh && a.mm===mm && a.ss===ss);
+      if (exists){
+        alert("같은 시간이 이미 등록되어 있습니다.");
+        return;
+      }
+
+      alarms.push({ hh, mm, ss, firedKey: "" });
+      renderAlarmStatus();
+    });
+
+    let dragging = false;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    function getCenterRect(el){
+      const r = el.getBoundingClientRect();
+      return { cx: (r.left + r.right)/2, cy: (r.top + r.bottom)/2, rect: r };
+    }
+
+    function headTouchesPort(){
+      const p = port.getBoundingClientRect();
+      const h = getCenterRect(cableHead);
+      // 헤드 중심점이 포트 내부면 접촉
+      return (h.cx >= p.left && h.cx <= p.right && h.cy >= p.top && h.cy <= p.bottom);
+    }
+
+    function updateConnectState(){
+      setCharging(headTouchesPort());
+    }
+
+    function setCablePos(clientX, clientY){
+      // cable은 stage 기준 absolute (left/top)
+      const stage = document.querySelector(".stage");
+      const s = stage.getBoundingClientRect();
+      const x = clientX - s.left - dragOffsetX;
+      const y = clientY - s.top  - dragOffsetY;
+
+      cable.style.left = `${x}px`;
+      cable.style.top  = `${y}px`;
+
+      updateConnectState();
+    }
+
+    cable.addEventListener("pointerdown", (e)=>{
+      dragging = true;
+      cable.setPointerCapture(e.pointerId);
+
+      const r = cable.getBoundingClientRect();
+      dragOffsetX = e.clientX - r.left;
+      dragOffsetY = e.clientY - r.top;
+
+      cable.classList.add("dragging");
+    });
+
+    cable.addEventListener("pointermove", (e)=>{
+      if (!dragging) return;
+      setCablePos(e.clientX, e.clientY);
+    });
+
+    cable.addEventListener("pointerup", ()=>{
+      dragging = false;
+      cable.classList.remove("dragging");
+      updateConnectState();
+    });
+
+    cable.addEventListener("pointercancel", ()=>{
+      dragging = false;
+      cable.classList.remove("dragging");
+      updateConnectState();
+    });
+
+    // 시작
+    setBattery(100);
+    renderAlarmStatus();
+
+    window.addEventListener("load", ()=>{
+      // 초기 연결 상태 계산
+      updateConnectState();
+      requestAnimationFrame(tick);
+    });
+
+    window.addEventListener("resize", updateConnectState);
+  </script>
+</body>
+</html>

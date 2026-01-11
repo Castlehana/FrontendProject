@@ -1,0 +1,362 @@
+<!-- index.html (전체) -->
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project#2 계산기</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="app">
+    <section class="calc" aria-label="calculator">
+      <header class="display" aria-label="display">
+        <!-- FR2: 입력된 숫자/연산 기호 표시 (여기 클릭하면 FR5 기록 토글) -->
+        <div class="display_history" id="history"></div>
+        <div class="display_result" id="result">0</div>
+      </header>
+
+      <!-- 기존 레이아웃/디자인 유지: classes 그대로, data-*만 추가 -->
+      <div class="keys" aria-label="keys">
+        <!-- 1행 -->
+        <button class="key key--util" data-action="back">⌫</button>
+        <button class="key key--util" data-action="c">C</button>
+        <button class="key key--util" data-action="ce">%</button>
+        <button class="key key--op" data-op="/">÷</button>
+
+        <!-- 2행 -->
+        <button class="key" data-num="7">7</button>
+        <button class="key" data-num="8">8</button>
+        <button class="key" data-num="9">9</button>
+        <button class="key key--op" data-op="*">×</button>
+
+        <!-- 3행 -->
+        <button class="key" data-num="4">4</button>
+        <button class="key" data-num="5">5</button>
+        <button class="key" data-num="6">6</button>
+        <button class="key key--op" data-op="-">−</button>
+
+        <!-- 4행 -->
+        <button class="key" data-num="1">1</button>
+        <button class="key" data-num="2">2</button>
+        <button class="key" data-num="3">3</button>
+        <button class="key key--op" data-op="+">+</button>
+
+        <!-- 5행 -->
+        <button class="key" data-action="sign">±</button>
+        <button class="key key--zero" data-num="0">0</button>
+        <button class="key" data-action="dot">.</button>
+        <button class="key key--eq" data-action="eq">=</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // -------------------------
+    // FR1: 숫자(0~9), 사칙연산(+,-,*,/)
+    // FR2: 상단에 현재 입력 수식 표시
+    // FR3: '=' 누르면 결과 표시
+    // FR4: AC(C) 전체 초기화 / %(CE) 현재 입력만 초기화 / ⌫ 백스페이스
+    // FR5: 추가 기능 1개 = "연산 기록 저장/보기"
+    //      - 레이아웃 변경 없이 display_history 클릭으로 기록 토글
+    // optional: 숫자 길이 제한
+    // -------------------------
+
+    const elHistory = document.getElementById("history");
+    const elResult  = document.getElementById("result");
+    const keys      = document.querySelector(".keys");
+
+    const MAX_DIGITS = 12; // (optional) 숫자 길이 제한
+
+    // 상태
+    let a = null;         // number
+    let op = null;        // '+','-','*','/'
+    let bStr = "0";       // 현재 입력 문자열
+    let justEvaluated = false;
+
+    // FR5: 기록 (최근 5개만, localStorage 저장)
+    const STORAGE_KEY = "calc_history_v1";
+    let records = loadRecords();
+    let showRecords = false;
+
+    function loadRecords() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
+    function saveRecords() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); } catch {}
+    }
+
+    function formatOp(symbol) {
+      if (symbol === "+") return "+";
+      if (symbol === "-") return "−";
+      if (symbol === "*") return "×";
+      if (symbol === "/") return "÷";
+      return symbol;
+    }
+
+    function sanitizeNumStr(s) {
+      // "00012" -> "12", "-00012" -> "-12", "0." 유지
+      const neg = s.startsWith("-");
+      let t = neg ? s.slice(1) : s;
+
+      if (t.includes(".")) {
+        const [i, f] = t.split(".");
+        const ii = (i.replace(/^0+(?=\d)/, "") || "0");
+        t = ii + "." + f;
+      } else {
+        t = (t.replace(/^0+(?=\d)/, "") || "0");
+      }
+      return neg ? "-" + t : t;
+    }
+
+    function digitCount(s) {
+      return s.replace("-", "").replace(".", "").length;
+    }
+
+    function setBStr(next) {
+      let s = next;
+      if (s !== "0" && s !== "-0" && s !== "Error") s = sanitizeNumStr(s);
+      bStr = s;
+      elResult.textContent = bStr;
+    }
+
+    function toNumber(s) {
+      if (s === "Error") return NaN;
+      if (s === "-" || s === "" || s === ".") return 0;
+      if (s.endsWith(".")) return Number(s.slice(0, -1));
+      return Number(s);
+    }
+
+    function compute(x, operator, y) {
+      if (operator === "+") return x + y;
+      if (operator === "-") return x - y;
+      if (operator === "*") return x * y;
+      if (operator === "/") return (y === 0) ? NaN : x / y;
+      return NaN;
+    }
+
+    function normalizeResult(n) {
+      if (!Number.isFinite(n)) return "Error";
+      // 너무 길면 적당히 줄이기
+      const s = String(n);
+      if (s.replace("-", "").replace(".", "").length > 14) {
+        return n.toPrecision(12).replace(/\.?0+$/,"");
+      }
+      return s;
+    }
+
+    function exprTextLive() {
+      // FR2: "현재 입력 상황" 표시
+      const left = (a === null) ? "" : String(a);
+      const mid = op ? ` ${formatOp(op)} ` : "";
+      const right = (op && !justEvaluated) ? bStr : "";
+      return (left + mid + right).trim();
+    }
+
+    function pushRecord(expr, value) {
+      records.unshift({ expr, value, t: Date.now() });
+      if (records.length > 5) records = records.slice(0, 5);
+      saveRecords();
+    }
+
+    function renderRecordsInline() {
+      if (records.length === 0) return "기록 없음";
+      return records
+        .map((r, i) => `${i + 1}) ${r.expr} = ${r.value}`)
+        .join("\n");
+    }
+
+
+
+    function render() {
+      elHistory.textContent = showRecords ? renderRecordsInline() : exprTextLive();
+      elResult.textContent = bStr;
+    }
+
+    // -------- 입력 처리 --------
+    function inputDigit(d) {
+      if (bStr === "Error") setBStr("0");
+
+      if (justEvaluated && op === null) {
+        // 결과 직후 새 숫자 입력이면 초기화하고 시작
+        a = null;
+        setBStr(d);
+        justEvaluated = false;
+        render();
+        return;
+      }
+
+      // 길이 제한(숫자만 카운트)
+      const candidate =
+        (bStr === "0")  ? d :
+        (bStr === "-0") ? ("-" + d) :
+        (bStr + d);
+
+      if (digitCount(candidate) > MAX_DIGITS) return;
+
+      setBStr(candidate);
+      justEvaluated = false;
+      render();
+    }
+
+    function inputDot() {
+      if (bStr === "Error") setBStr("0");
+
+      if (justEvaluated && op === null) {
+        a = null;
+        setBStr("0.");
+        justEvaluated = false;
+        render();
+        return;
+      }
+
+      if (!bStr.includes(".")) setBStr(bStr + ".");
+      justEvaluated = false;
+      render();
+    }
+
+    function toggleSign() {
+      if (bStr === "Error") return;
+
+      if (bStr.startsWith("-")) setBStr(bStr.slice(1));
+      else setBStr(bStr === "0" ? "-0" : "-" + bStr);
+
+      render();
+    }
+
+    function backspace() {
+      if (bStr === "Error") {
+        setBStr("0");
+        render();
+        return;
+      }
+      if (justEvaluated && op === null) return;
+
+      if (bStr.length <= 1 || (bStr.length === 2 && bStr.startsWith("-"))) {
+        setBStr("0");
+      } else {
+        setBStr(bStr.slice(0, -1));
+        if (bStr === "-" || bStr === "") setBStr("0");
+      }
+      render();
+    }
+
+    // FR4
+    function clearC() {
+      a = null;
+      op = null;
+      bStr = "0";
+      justEvaluated = false;
+      render();
+    }
+
+    function clearCE() {
+      bStr = "0";
+      justEvaluated = false;
+      render();
+    }
+
+    function chooseOp(nextOp) {
+      if (bStr === "Error") return;
+
+      const b = toNumber(bStr);
+
+      if (a === null) {
+        a = b;
+        op = nextOp;
+        bStr = "0";
+        justEvaluated = false;
+        render();
+        return;
+      }
+
+      // 이미 연산자가 있고, 지금까지 입력이 있으면 중간 계산
+      if (op !== null && !justEvaluated) {
+        const r = compute(a, op, b);
+        const rStr = normalizeResult(r);
+
+        if (rStr === "Error") {
+          a = null; op = null; bStr = "Error";
+          render();
+          return;
+        }
+
+        a = Number(rStr);
+        op = nextOp;
+        bStr = "0";
+        justEvaluated = false;
+        render();
+        return;
+      }
+
+      // 연산자만 교체
+      op = nextOp;
+      justEvaluated = false;
+      render();
+    }
+
+    // FR3
+    function equal() {
+      if (bStr === "Error") return;
+      if (a === null || op === null) return;
+
+      const b = toNumber(bStr);
+      const exprHuman = `${a} ${formatOp(op)} ${b}`;
+
+      const r = compute(a, op, b);
+      const rStr = normalizeResult(r);
+
+      bStr = rStr;
+      elResult.textContent = bStr;
+
+      // FR2: 계산 완료 시에도 수식이 보이게
+      elHistory.textContent = exprHuman;
+
+      // FR5: 기록 저장(정상 결과만)
+      if (rStr !== "Error") pushRecord(`${a}${formatOp(op)}${b}`, rStr);
+
+      if (rStr === "Error") {
+        a = null;
+        op = null;
+      } else {
+        a = Number(rStr);
+        op = null;
+      }
+
+      justEvaluated = true;
+    }
+
+    // -------- 이벤트 --------
+    keys.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+
+      const num = btn.dataset.num;
+      const opSymbol = btn.dataset.op;
+      const action = btn.dataset.action;
+
+      if (num !== undefined) inputDigit(num);
+      else if (opSymbol) chooseOp(opSymbol);
+      else if (action === "dot") inputDot();
+      else if (action === "sign") toggleSign();
+      else if (action === "back") backspace();
+      else if (action === "c") clearC();
+      else if (action === "ce") clearCE();
+      else if (action === "eq") equal();
+    });
+
+    // FR5: 기록 토글(레이아웃 변경 없음)
+    elHistory.addEventListener("click", () => {
+      showRecords = !showRecords;
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>
